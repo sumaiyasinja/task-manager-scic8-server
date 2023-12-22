@@ -6,12 +6,18 @@ const app = express()
 const port = process.env.PORT || 5000
 
 // middleware
-app.use(cors())
-app.use(express.json())
+app.use(
+    cors({
+      origin: ["http://localhost:5173"],
+      credentials: true,
+    })
+  );
+  app.use(express.json())
+  
 
 
 app.get('/', (req, res) => {
-  res.send('Welcome to your automotive shop server!')
+  res.send('Welcome to your task manager server!')
 })
 
 
@@ -34,16 +40,38 @@ async function run() {
     const database = client.db("TaskManagerDB");
     const TaskCollection = database.collection("TaskCollection");
    
+    // middlewares
+    const verifyToken = (req, res, next) => {
+        // console.log('inside verify token', req.headers.authorization);
+        if (!req.headers.authorization) {
+          return res.status(401).send({ message: "unauthorized access" });
+        }
+        const token = req.headers.authorization.split(" ")[1];
+        jwt.verify(token, process.env.SECRET, (err, decoded) => {
+          if (err) {
+            return res.status(401).send({ message: "unauthorized access" });
+          }
+          req.decoded = decoded;
+          next();
+        });
+      };
     // Read all tasks
     app.get('/tasks', async(req,res)=>{  
       const result = await TaskCollection.find().toArray();
       res.send(result);
     })
+    // Read specific user tasks
+    app.get('/tasks/email', async(req,res)=>{  
+      const email = req.query.email
+      const query = {email : email}
+      const result = await TaskCollection.find(query).toArray();
+      res.send(result);
+    })
     // post tasks
     app.post('/tasks', async(req,res)=>{
-        const newCar= req.body
-        console.log(newCar)
-        const result = await TaskCollection.insertOne(newCar);
+        const newTask= req.body
+        console.log(newTask)
+        const result = await TaskCollection.insertOne(newTask);
         res.send(result)
       })
 
@@ -58,25 +86,25 @@ async function run() {
     // update by id
     app.put('/tasks/:id', async (req, res) => {
       const id = req.params.id;
-      const car = req.body;
-      console.log("Body", id, car);
+      const Task = req.body;
+      console.log("Body", id, Task);
       const filter = { _id: new ObjectId(id) };
       const options = { upsert: true };
-      const updatedCar ={
+      const updatedTAsk ={
         $set: {
-         name : car.name,
-         price : car.price,
-         rating : car.rating,
-         brands : car.brands,
-         types : car.types,
-         description : car.description,
-         photo : car.photo,
+         name : Task.name,
+         price : Task.price,
+         rating : Task.rating,
+         brands : Task.brands,
+         types : Task.types,
+         description : Task.description,
+         photo : Task.photo,
 
       },
     };
       const result = await TaskCollection.updateOne(
         filter,
-        updatedCar,
+        updatedTask,
         options
       );
       res.send(result);
